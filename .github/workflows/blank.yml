@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      USER: root
+      HOST: 49.12.4.45
+      PORT: 10201
+      GIT_USER: s.massimo
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+        shell: bash
+
+      - name: Deploy, Compile, and Restart server with PM2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -p ${{ env.PORT }} ${{ env.USER }}@${{ env.HOST }} << 'EOF'
+            set -e  # Stop script if any command fails
+            cd /app
+            
+            # Configura Git per usare il token PAT per autenticazione HTTPS
+            git config --global credential.helper 'store'
+            echo "https://${{ env.GIT_USER }}:${{ env.PAT_TOKEN }}@github.com" > ~/.git-credentials
+            
+            # Verifica se l'origine remota è configurata
+            if git remote get-url origin > /dev/null 2>&1; then
+              echo "Remote 'origin' already exists."
+            else
+              git remote add origin https://github.com/onthecloud-srl/keyello-backend.git
+            fi
+            
+            # Esegui il pull del repository
+            git pull origin main || { echo 'Git pull failed'; exit 1; }
+            
+            # Installa le dipendenze
+            npm install || { echo 'npm install failed'; exit 1; }
+            
+            # Verifica la presenza di TypeScript
+            if ! npx tsc -v > /dev/null 2>&1; then
+              echo "TypeScript is not installed. Installing it..."
+              npm install typescript || { echo 'Failed to install TypeScript'; exit 1; }
+            fi
+            
+            # Compila TypeScript in JavaScript
+            if [ -f tsconfig.json ]; then
+              echo "Found tsconfig.json. Starting TypeScript compilation..."
+              npx tsc || { echo 'TypeScript compilation failed'; exit 1; }
+              echo "TypeScript compilation completed."
+            else
+              echo "No tsconfig.json found. Skipping TypeScript compilation."
+            fi
+            
+            # Assicurati che PM2 punti ai file compilati (ad esempio, nella cartella dist)
+            pm2 restart ecosystem.config.js || { echo 'PM2 restart failed'; exit 1; }
+            
+            # Verifica lo stato dell'app
+            pm2 list || { echo 'PM2 list failed'; exit 1; }
+            
+            # Pulisci i file delle credenziali, ignorando errori se il file non esiste
+            rm -f ~/.git-credentials
+          EOF
+        shell: bash
