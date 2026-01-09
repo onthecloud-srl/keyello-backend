@@ -28,7 +28,7 @@ const commonConfig = {
 };
 
 const dbConfigs: { [key: string]: DbConfig } = {
-  keyello: { ...commonConfig, DB: process.env.DB_NAME_KEYELLO },
+  keyello: { ...commonConfig, DB: process.env.DB_NAME_KEYELLO! },
 };
 
 export default dbConfigs;
