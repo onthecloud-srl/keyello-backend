@@ -1,4 +1,5 @@
 import { Dialect } from "sequelize";
+import { KEYELLO } from "../types/db.types";
 
 interface DbConfig {
   HOST: string;
