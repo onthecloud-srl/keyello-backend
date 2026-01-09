@@ -1,4 +1,5 @@
 import { Dialect } from "sequelize";
+import { KEYELLO } from "../types/db.types";
 
 interface DbConfig {
   HOST: string;
@@ -28,7 +29,7 @@ const commonConfig = {
 };
 
 const dbConfigs: { [key: string]: DbConfig } = {
-  keyello: { ...commonConfig, DB: process.env.DB_NAME_KEYELLO },
+  keyello: { ...commonConfig, DB: KEYELLO },
 };
 
 export default dbConfigs;
